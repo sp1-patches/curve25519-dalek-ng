@@ -9,10 +9,7 @@
 
 use core::{convert::TryInto, ops::AddAssign};
 
-use crate::{
-    edwards::{self, EdwardsPoint},
-    field::FieldElement,
-};
+use crate::{edwards::EdwardsPoint, field::FieldElement};
 
 use super::{constants, field::FieldElemetLimbs32};
 
@@ -68,8 +65,8 @@ impl AffinePoint {
     }
 }
 
-impl From<edwards::EdwardsPoint> for AffinePoint {
-    fn from(value: edwards::EdwardsPoint) -> Self {
+impl From<EdwardsPoint> for AffinePoint {
+    fn from(value: EdwardsPoint) -> Self {
         let mut limbs = [0u32; 16];
 
         assert_eq!(value.Z, FieldElement::one());
@@ -136,6 +133,20 @@ impl AddAssign<&AffinePoint> for AffinePoint {
     }
 }
 
+#[allow(non_snake_case)]
+pub fn normalize(p: &EdwardsPoint) -> EdwardsPoint {
+    let EdwardsPoint { X, Y, Z, T } = p;
+
+    let Z_inv = Z.invert();
+
+    EdwardsPoint {
+        X: X * &Z_inv,
+        Y: Y * &Z_inv,
+        Z: FieldElement::one(),
+        T: T * &Z_inv,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{
@@ -143,36 +154,24 @@ mod tests {
         scalar::Scalar,
     };
 
-    use self::edwards::EdwardsPoint;
-
     use super::*;
 
     #[no_mangle]
     extern "C" fn syscall_ed_add(p: *mut u32, q: *const u32) {
-        let p = AffinePoint::from_limbs(unsafe {
+        let p_affine = AffinePoint::from_limbs(unsafe {
             core::slice::from_raw_parts_mut(p, 16).try_into().unwrap()
         });
-        let q = AffinePoint::from_limbs(unsafe {
+        let q_affine = AffinePoint::from_limbs(unsafe {
             core::slice::from_raw_parts(q, 16).try_into().unwrap()
         });
 
-        let mut p = EdwardsPoint::from(p);
-        let q = EdwardsPoint::from(q);
-        p += q;
-    }
+        let p_edwards = EdwardsPoint::from(p_affine);
+        let q_edwards = EdwardsPoint::from(q_affine);
+        let p_plus_q = AffinePoint::from(normalize(&(p_edwards + q_edwards)));
 
-    #[allow(non_snake_case)]
-    fn normalize(p: &EdwardsPoint) -> EdwardsPoint {
-        let EdwardsPoint { X, Y, Z, T } = p;
-
-        let Z_inv = Z.invert();
-
-        EdwardsPoint {
-            X: X * &Z_inv,
-            Y: Y * &Z_inv,
-            Z: FieldElement::one(),
-            T: T * &Z_inv,
-        }
+        let limbs: &mut [u32] =
+            unsafe { core::slice::from_raw_parts_mut(p, 16).try_into().unwrap() };
+        limbs.copy_from_slice(&p_plus_q.limbs);
     }
 
     // Computes `scalar * p` using the serial backend and normalizes the `Z` coordinate.
@@ -205,6 +204,8 @@ mod tests {
             let p_affine = AffinePoint::from(p);
             let p_back = EdwardsPoint::from(p_affine);
             assert_eq!(p, p_back);
+            let p_back_affine = AffinePoint::from(p_back);
+            assert_eq!(p_affine, p_back_affine);
         }
     }
 
