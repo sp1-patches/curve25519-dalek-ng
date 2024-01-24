@@ -60,3 +60,6 @@ pub mod serial;
     ))))
 )]
 pub mod vector;
+
+#[cfg(feature = "zkvm_backend")]
+pub mod zkvm;
