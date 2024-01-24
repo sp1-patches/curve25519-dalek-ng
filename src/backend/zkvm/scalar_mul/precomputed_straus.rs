@@ -8,7 +8,7 @@ pub struct VartimePrecomputedStraus {}
 impl VartimePrecomputedMultiscalarMul for VartimePrecomputedStraus {
     type Point = EdwardsPoint;
 
-    fn new<I>(static_points: I) -> Self
+    fn new<I>(_static_points: I) -> Self
     where
         I: IntoIterator,
         I::Item: Borrow<Self::Point>,
@@ -18,9 +18,9 @@ impl VartimePrecomputedMultiscalarMul for VartimePrecomputedStraus {
 
     fn optional_mixed_multiscalar_mul<I, J, K>(
         &self,
-        static_scalars: I,
-        dynamic_scalars: J,
-        dynamic_points: K,
+        _static_scalars: I,
+        _dynamic_scalars: J,
+        _dynamic_points: K,
     ) -> Option<Self::Point>
     where
         I: IntoIterator,

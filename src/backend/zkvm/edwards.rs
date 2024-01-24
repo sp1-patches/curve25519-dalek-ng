@@ -148,7 +148,7 @@ pub fn normalize(p: &EdwardsPoint) -> EdwardsPoint {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use crate::{
         backend::{self, serial::u32::constants::ED25519_BASEPOINT_POINT},
         scalar::Scalar,
@@ -175,7 +175,7 @@ mod tests {
     }
 
     // Computes `scalar * p` using the serial backend and normalizes the `Z` coordinate.
-    fn serial_scalar_mul(p: &EdwardsPoint, scalar: &Scalar) -> EdwardsPoint {
+    pub fn serial_scalar_mul(p: &EdwardsPoint, scalar: &Scalar) -> EdwardsPoint {
         normalize(&backend::serial::scalar_mul::variable_base::mul(p, scalar))
     }
 

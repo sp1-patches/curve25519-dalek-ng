@@ -9,7 +9,7 @@ pub struct Pippenger;
 impl VartimeMultiscalarMul for Pippenger {
     type Point = EdwardsPoint;
 
-    fn optional_multiscalar_mul<I, J>(scalars: I, points: J) -> Option<EdwardsPoint>
+    fn optional_multiscalar_mul<I, J>(_scalars: I, _points: J) -> Option<EdwardsPoint>
     where
         I: IntoIterator,
         I::Item: Borrow<Scalar>,
