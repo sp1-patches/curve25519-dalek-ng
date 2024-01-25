@@ -134,6 +134,7 @@ impl AddAssign<&AffinePoint> for AffinePoint {
 }
 
 #[allow(non_snake_case)]
+#[allow(dead_code)]
 pub fn normalize(p: &EdwardsPoint) -> EdwardsPoint {
     let EdwardsPoint { X, Y, Z, T } = p;
 
