@@ -93,6 +93,7 @@
 #![allow(non_snake_case)]
 
 use core::borrow::Borrow;
+use core::convert::TryInto;
 use core::fmt::Debug;
 use core::iter::Iterator;
 use core::iter::Sum;
@@ -171,6 +172,10 @@ impl Debug for CompressedEdwardsY {
     }
 }
 
+extern "C" {
+    fn syscall_ed_decompress(p: *mut u8);
+}
+
 impl CompressedEdwardsY {
     /// View this `CompressedEdwardsY` as an array of bytes.
     pub fn as_bytes(&self) -> &[u8; 32] {
@@ -187,21 +192,29 @@ impl CompressedEdwardsY {
     /// Returns `None` if the input is not the \\(y\\)-coordinate of a
     /// curve point.
     pub fn decompress(&self) -> Option<EdwardsPoint> {
-        let Y = FieldElement::from_bytes(self.as_bytes());
-        let Z = FieldElement::one();
-        let YY = Y.square();
-        let u = &YY - &Z; // u =  y²-1
-        let v = &(&YY * &constants::EDWARDS_D) + &Z; // v = dy²+1
-        let (is_valid_y_coord, mut X) = FieldElement::sqrt_ratio_i(&u, &v);
-
-        if is_valid_y_coord.unwrap_u8() != 1u8 {
-            return None;
+        let mut XY_bytes = [0_u8; 64];
+        XY_bytes[32..].copy_from_slice(self.as_bytes());
+        unsafe {
+            syscall_ed_decompress(XY_bytes.as_mut_ptr());
         }
+        let X = FieldElement::from_bytes(&XY_bytes[0..32].try_into().unwrap());
+        let Y = FieldElement::from_bytes(&XY_bytes[32..].try_into().unwrap());
 
-        // FieldElement::sqrt_ratio_i always returns the nonnegative square root,
-        // so we negate according to the supplied sign bit.
-        let compressed_sign_bit = Choice::from(self.as_bytes()[31] >> 7);
-        X.conditional_negate(compressed_sign_bit);
+        // let Y = FieldElement::from_bytes(self.as_bytes());
+        let Z = FieldElement::one();
+        // let YY = Y.square();
+        // let u = &YY - &Z; // u =  y²-1
+        // let v = &(&YY * &constants::EDWARDS_D) + &Z; // v = dy²+1
+        // let (is_valid_y_coord, mut X) = FieldElement::sqrt_ratio_i(&u, &v);
+
+        // if is_valid_y_coord.unwrap_u8() != 1u8 {
+        //     return None;
+        // }
+
+        // // FieldElement::sqrt_ratio_i always returns the nonnegative square root,
+        // // so we negate according to the supplied sign bit.
+        // let compressed_sign_bit = Choice::from(self.as_bytes()[31] >> 7);
+        // X.conditional_negate(compressed_sign_bit);
 
         Some(EdwardsPoint {
             X,
