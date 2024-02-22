@@ -136,7 +136,7 @@ use traits::{VartimeMultiscalarMul, VartimePrecomputedMultiscalarMul};
         feature = "simd_backend",
         any(target_feature = "avx2", target_feature = "avx512ifma"),
     )),
-    not(feature = "zkvm_backend")
+    not(all(target_os = "zkvm", target_vendor = "succinct"))
 ))]
 use backend::serial::scalar_mul;
 #[cfg(all(
@@ -145,7 +145,7 @@ use backend::serial::scalar_mul;
 ))]
 use backend::vector::scalar_mul;
 
-#[cfg(feature = "zkvm_backend")]
+#[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
 use backend::zkvm::scalar_mul;
 
 // ------------------------------------------------------------------------
