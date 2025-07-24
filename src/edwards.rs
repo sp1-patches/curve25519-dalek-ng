@@ -353,11 +353,17 @@ impl CompressedEdwardsY {
     /// 
     /// Accelerated with SP1's EdDecompress syscall.
     fn decompress_with_syscall(&self) -> EdwardsPoint {
-        let mut XY_bytes = [0_u8; 64];
+        #[cfg(not(target_endian = "little"))]
+        compile_error!("expected target to be little endian");
+        let mut XY_bytes_u64 = [0_u64; 8];
+        let XY_bytes =
+            unsafe { core::mem::transmute::<&mut [u64; 8], &mut [u8; 64]>(&mut XY_bytes_u64) };
         XY_bytes[32..].copy_from_slice(self.as_bytes());
         unsafe {
-            sp1_lib::syscall_ed_decompress(&mut XY_bytes);
+            sp1_lib::syscall_ed_decompress(&mut XY_bytes_u64);
         }
+        let XY_bytes =
+            unsafe { core::mem::transmute::<&mut [u64; 8], &mut [u8; 64]>(&mut XY_bytes_u64) };
         let X = FieldElement::from_bytes(&XY_bytes[0..32].try_into().unwrap());
         let Y = FieldElement::from_bytes(&XY_bytes[32..].try_into().unwrap());
         let Z = FieldElement::one();
