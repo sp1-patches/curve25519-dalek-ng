@@ -148,6 +148,7 @@ use backend::vector::scalar_mul;
 mod conversions {
     use sp1_lib::{ed25519::Ed25519AffinePoint, utils::AffinePoint};
     use super::read_and_verify_canon;
+    use super::halt_invalid_hint;
     use super::EdwardsPoint;
     use super::FieldElement;
     use core::convert::TryInto;
@@ -163,8 +164,10 @@ mod conversions {
             }
 
             // Check that the hint is canonical, and an inverse.
-            let z_inv = read_and_verify_canon().unwrap();
-            assert!(&z_inv * &value.Z == FieldElement::one(), "The inverse of z is not correct. This is a bug.");
+            let z_inv = read_and_verify_canon();
+            if &z_inv * &value.Z != FieldElement::one() {
+                halt_invalid_hint();
+            }
 
             // Multiply by `z_inv` to normalize the point.
             let value_x = &value.X * &z_inv;
@@ -320,15 +323,21 @@ impl CompressedEdwardsY {
             // We additionally check that `hinted_root` is non-zero to handle zero.
             
             // v_inv is checked to be canonical and a correct inverse.
-            let v_inv = read_and_verify_canon().unwrap();
-            assert!(&v_inv * &v == FieldElement::one(), "The inverse of v is not correct. This is a bug.");
+            let v_inv = read_and_verify_canon();
+            if &v_inv * &v != FieldElement::one() {
+                halt_invalid_hint();
+            }
 
             // hinted_root is checked to be canonical and non-zero.
-            let hinted_root = read_and_verify_canon().unwrap();
-            assert!(hinted_root != FieldElement::zero(), "0 is a quadratic residue");
-            
+            let hinted_root = read_and_verify_canon();
+            if hinted_root == FieldElement::zero() {
+                halt_invalid_hint();
+            }
+
             // Constrain `hinted_root * hinted_root = NQR * u_div_v`
-            assert_eq!(hinted_root.square(), &(&nqr * &u) * &v_inv, "The hinted root does not satisfy the NQR check. This is a bug.");
+            if hinted_root.square() != &(&nqr * &u) * &v_inv {
+                halt_invalid_hint();
+            }
 
             return None;
         }
@@ -377,18 +386,29 @@ impl CompressedEdwardsY {
 }
 
 #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
-fn read_and_verify_canon() -> Option<FieldElement> {
-    let raw_bytes: [u8; 32] = sp1_lib::io::read_vec().try_into().unwrap();
-    
+#[inline(never)]
+fn halt_invalid_hint() -> ! {
+    // Exit code 3 = invalid prover hint. This prevents a malicious prover from
+    // forging a "panic" (exit code 1) by supplying a wrong hint.
+    unsafe { sp1_lib::syscall_halt(3) }
+}
+
+#[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
+fn read_and_verify_canon() -> FieldElement {
+    let raw_bytes: [u8; 32] = match sp1_lib::io::read_vec().try_into() {
+        Ok(b) => b,
+        Err(_) => halt_invalid_hint(),
+    };
+
     let fe = FieldElement::from_bytes(&raw_bytes);
 
-    // Check that the read hint is canonical. 
+    // Check that the read hint is canonical.
     // Compare the hint with the result of `to_bytes`, which returns canonical form.
     if fe.to_bytes() != raw_bytes {
-        return None;
+        halt_invalid_hint();
     }
 
-    Some(fe)
+    fe
 }
 
 // ------------------------------------------------------------------------
