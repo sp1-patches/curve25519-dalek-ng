@@ -165,7 +165,7 @@ mod conversions {
             // Check that the hint is canonical, and an inverse.
             let z_inv = read_and_verify_canon();
             if &z_inv * &value.Z != FieldElement::one() {
-                sp1_lib::halt_invalid_hint();
+                sp1_lib::invalid_hint!("ed25519 z-inverse hint did not invert Z");
             }
 
             // Multiply by `z_inv` to normalize the point.
@@ -324,18 +324,18 @@ impl CompressedEdwardsY {
             // v_inv is checked to be canonical and a correct inverse.
             let v_inv = read_and_verify_canon();
             if &v_inv * &v != FieldElement::one() {
-                sp1_lib::halt_invalid_hint();
+                sp1_lib::invalid_hint!("ed25519 decompress: v-inverse hint did not invert v");
             }
 
             // hinted_root is checked to be canonical and non-zero.
             let hinted_root = read_and_verify_canon();
             if hinted_root == FieldElement::zero() {
-                sp1_lib::halt_invalid_hint();
+                sp1_lib::invalid_hint!("ed25519 decompress: NQR-root hint is zero");
             }
 
             // Constrain `hinted_root * hinted_root = NQR * u_div_v`
             if hinted_root.square() != &(&nqr * &u) * &v_inv {
-                sp1_lib::halt_invalid_hint();
+                sp1_lib::invalid_hint!("ed25519 decompress: NQR-root hint failed root^2 = nqr*u/v");
             }
 
             return None;
@@ -388,7 +388,7 @@ impl CompressedEdwardsY {
 fn read_and_verify_canon() -> FieldElement {
     let raw_bytes: [u8; 32] = match sp1_lib::io::read_vec().try_into() {
         Ok(b) => b,
-        Err(_) => sp1_lib::halt_invalid_hint(),
+        Err(_) => sp1_lib::invalid_hint!("ed25519 field-element hint is not 32 bytes"),
     };
 
     let fe = FieldElement::from_bytes(&raw_bytes);
@@ -396,7 +396,7 @@ fn read_and_verify_canon() -> FieldElement {
     // Check that the read hint is canonical.
     // Compare the hint with the result of `to_bytes`, which returns canonical form.
     if fe.to_bytes() != raw_bytes {
-        sp1_lib::halt_invalid_hint();
+        sp1_lib::invalid_hint!("ed25519 field-element hint is not canonical");
     }
 
     fe
